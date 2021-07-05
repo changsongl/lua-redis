@@ -1,11 +1,11 @@
 local action = KEYS[1]
 
 local function lock()
-    return 1
+    return 0
 end
 
 local function unlock()
-    return 1
+    return 0
 end
 
 if action == nil
