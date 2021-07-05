@@ -1,5 +1,7 @@
+-- 获取命令 lock | unlock
 local action = KEYS[1]
 
+-- lock 方法 lock $lockerKey $uuid $expireSeconds
 local function lock()
     local keysNum = #KEYS
     if keysNum ~= 4 then
@@ -15,6 +17,7 @@ local function lock()
     end
 end
 
+-- unlock 方法 unlock $lockerKey $uuid 只有当前是这个uuid锁才会进行unlock
 local function unlock()
     local keysNum = #KEYS
     if keysNum ~= 3 then
@@ -30,10 +33,12 @@ local function unlock()
     return 0
 end
 
+-- 检查action是否为空
 if action == nil then
     return redis.error_reply("action is missing")
 end
 
+-- 调用命令
 if string.lower(action) == "lock" then
     return lock()
 elseif string.lower(action) == "unlock" then
