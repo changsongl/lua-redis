@@ -43,11 +43,17 @@ func main(){
 		os.Exit(1)
 	}
 
-	result, err := redis.Int(c.Do("EVALSHA", checkSum, 1, "lock"))
-	if err != nil {
+	result, err := redis.Int(c.Do("EVALSHA", checkSum, 4, "lock", "locker", "uuid", "80"))
+	if err != nil && err != redis.ErrNil{
 		println("SCRIPT LOAD failed:", err.Error())
 		os.Exit(1)
 	}
+	fmt.Println(result, err)
 
+	result, err = redis.Int(c.Do("EVALSHA", checkSum, 3, "unlock", "locker", "uuid"))
+	if err != nil && err != redis.ErrNil{
+		println("SCRIPT LOAD failed:", err.Error())
+		os.Exit(1)
+	}
 	fmt.Println(result, err)
 }
