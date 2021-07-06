@@ -1,14 +1,13 @@
 -- 获取命令 lock | unlock
-local action = KEYS[1]
+local action = ARGV[1]
 
 -- lock 方法 lock $lockerKey $uuid $expireSeconds
 local function lock()
-    local keysNum = #KEYS
-    if keysNum ~= 4 then
+    local lockerKey, value, expireSeconds = KEYS[1], ARGV[2], ARGV[3]
+    if #KEYS ~=1 or #ARGV ~= 3 then
         return redis.error_reply("wrong number of args")
     end
 
-    local lockerKey, value, expireSeconds = KEYS[2], KEYS[3], tonumber(KEYS[4])
     local setRs = redis.call("SET", lockerKey, value, "NX", "EX", expireSeconds)
     if type(setRs) == "table" and setRs["ok"] == "OK" then
         return 1
@@ -19,12 +18,11 @@ end
 
 -- unlock 方法 unlock $lockerKey $uuid 只有当前是这个uuid锁才会进行unlock
 local function unlock()
-    local keysNum = #KEYS
-    if keysNum ~= 3 then
+    if  #KEYS ~=1 or #ARGV ~= 2 then
         return redis.error_reply("wrong number of args")
     end
 
-    local lockerKey, value = KEYS[2], KEYS[3]
+    local lockerKey, value = KEYS[1], ARGV[2]
     local kValue = redis.call("GET", lockerKey)
     if kValue == value then
         redis.call("DEL", lockerKey)
