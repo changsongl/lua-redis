@@ -1,7 +1,5 @@
 # lua-redis
 
-[toc]
-
 ### 简介
 
 #### 优势：
@@ -58,4 +56,4 @@ redis> EVALSHA 232fd51614574cf0867b83d384a5e898cfd24e5a 0
 
 ### Reference:
 
-[Redis Lua实战](https://www.jianshu.com/p/366d1b4f0d13)
+Redis Lua实战 [[Link]](https://www.jianshu.com/p/366d1b4f0d13)
