@@ -126,12 +126,13 @@ Redis Nil multi bulk reply   ->   Lua false boolean type
          Lua boolean false   ->   Redis Nil bulk reply.
 ````
 * 注意事项
+
 1. Lua只有`一个数字类型`，Lua number。没有区分integer和floats，因此将`永远转换Lua numbers为integer回复`。
 如果需要floats类型，请return字符串。(ZSCORE指令就是这么实现的)
-   
-2. 由于Lua语义原因，Lua array不可以有nils。当redis reply转换到Lua array时会终止运行。
 
-3. 当Lua Table包含keys(和其values)，转换成redis reply将不会包含keys。
+2. 由于Lua`语义`原因，Lua array不可以有`nils`。当redis reply转换到Lua array时会`终止运行`。
+
+3. 当`Lua Table`包含keys(和其values)，转换成redis reply将`不会包含keys`。
 
 
 ##### RESP3 - Redis 6 协议
