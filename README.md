@@ -35,11 +35,12 @@ Lua脚本本身也可以看作为一种事务，而且使用脚本起来更简�
 ````shell
 EVAL script numkeys [key ...] [arg ...]
 
-> eval "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}" 2 key1 key2 first second
-1) "key1"
-2) "key2"
-3) "first"
-4) "second"
+# 运行脚本
+redis> EVAL "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}" 2 key1 key2 first second
+
+# 运行只读脚本，脚本需要不包含任何修改内容的操作。这个指令可以随意被kill掉，
+# 而且不会影响到副本的stream。这个指令可以在master和replica上执行。
+redis> EVAL_RO "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}" 2 key1 key2 first second
 ````
 
 2. 上传脚本，之后使用SHA1校验和来调用脚本。（潜在碰撞问题，在使用时一般会忽视）
@@ -50,10 +51,99 @@ EVALSHA sha1 numkeys key [key ...] arg [arg ...]
 redis> SCRIPT LOAD "return 'hello moto'"
 "232fd51614574cf0867b83d384a5e898cfd24e5a"
 
+# 运行脚本
 redis> EVALSHA 232fd51614574cf0867b83d384a5e898cfd24e5a 0
 "hello moto"
+
+# 运行只读脚本，脚本需要不包含任何修改内容的操作。这个指令可以随意被kill掉，
+# 而且不会影响到副本的stream。这个指令可以在master和replica上执行。
+redis> EVALSHA 232fd51614574cf0867b83d384a5e898cfd24e5a 0
 ````
+
+3. 其他一些指令
+* SCRIPT DEBUG 用来调试脚本 [[Document]](https://redis.io/commands/script-debug)
+* SCRIPT EXISTS 通过校验值用来检查脚本是否存在 [[Document]](https://redis.io/commands/script-exists)
+* SCRIPT FLUSH 清除脚本 [[Document]](https://redis.io/commands/script-flush)
+* SCRIPT KILL 停到现在执行中的脚本，默认脚本没有写操作 [[Document]](https://redis.io/commands/script-kill)
+
+4. 注意点
+- 运行脚本需要严格按照Keys和Args的要求来进行传参。
+  所有操作到的redis key应放到Keys对象中，否则可能会影响到在redis集群中错误表现。
+````shell
+# Bad
+> eval "return redis.call('set','foo','bar')" 0
+OK
+
+# Good
+> eval "return redis.call('set',KEYS[1],'bar')" 1 foo
+OK
+````
+
+#### 调用redis指令
+在redis lua脚本中最常用的就是调用redis原生的指令。有以下两个指令：
+1. redis.call(command, key, arg1, arg2...): 当调用发生错误时，自动终止脚本，强制把相关Lua 错误返回给客户端。
+2. redis.pcall(command, key, arg1, arg2...): 当调用发生错误时，会进行错误拦截，并返回相关错误。
+
+当调用redis.call和redis.pcall指令时Redis Reply会转换为Lua类型，当Lua脚本返回时，会将Lua类型转换为Redis Reply。
+因此这两种类型的转换是需要知晓的。可以阅读此文档了解Redis协议。[[Link]](http://redisdoc.com/topic/protocol.html)
+
+* Redis integer reply: 如EXISTS...
+* Redis bulk reply: 如GET...
+* Redis multi bulk reply: 如LRANGE...
+* Redis status reply: 如SET...
+* Redis error reply: 指令错误...
+
+##### 转换表
+* Redis回复类型转Lua类型转换表:
+```` 
+       Redis integer reply   ->   Lua number
+
+          Redis bulk reply   ->   Lua string
+
+    Redis multi bulk reply   ->   Lua table (may have other Redis data types nested)
+
+        Redis status reply   ->   Lua table with a single ok field containing the status
+
+         Redis error reply   ->   Lua table with a single err field containing the error
+
+      Redis Nil bulk reply   ->   Lua false boolean type
+
+Redis Nil multi bulk reply   ->   Lua false boolean type
+````
+
+* Lua类型类型转Redis回复转换表:
+````
+                Lua number   ->   Redis integer reply (the number is converted into an integer)
+
+                Lua string   ->   Redis bulk reply
+
+         Lua table (array)   ->   Redis multi bulk reply (truncated to the first nil inside the Lua array if any)
+
+         Lua table with      ->   Redis status reply
+         a single ok field
+
+         Lua table with      ->   Redis error reply
+         a single err field
+
+         Lua boolean false   ->   Redis Nil bulk reply.
+````
+* 注意事项
+1. Lua只有`一个数字类型`，Lua number。没有区分integer和floats，因此将`永远转换Lua numbers为integer回复`。
+如果需要floats类型，请return字符串。(ZSCORE指令就是这么实现的)
+   
+2. 由于Lua语义原因，Lua array不可以有nils。当redis reply转换到Lua array时会终止运行。
+
+3. 当Lua Table包含keys(和其values)，转换成redis reply将不会包含keys。
+
+
+##### RESP3 - Redis 6 协议
+如需要了解请查看官方文档 [[Link]](https://redis.io/commands/eval)
+
+### 示例
+* lock: 分布式锁
+
 
 ### Reference:
 
-Redis Lua实战 [[Link]](https://www.jianshu.com/p/366d1b4f0d13)
+* Redis Lua实战 [[Link]](https://www.jianshu.com/p/366d1b4f0d13)
+* Redis 官方文档 [[Link]](https://redis.io/commands/eval)
