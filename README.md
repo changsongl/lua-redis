@@ -134,7 +134,7 @@ Redis Nil multi bulk reply   ->   Lua false boolean type
 
 3. 当`Lua Table`包含keys(和其values)，转换成redis reply将`不会包含keys`。
 
-4. 在Redis Lua里面不可以使用os库，并且强烈建议大家不要使用redis.call("time")去获取时间。
+4. 在Redis Lua里面不可以使用`os库`，并且强烈建议大家不要使用`redis.call("time")`去获取时间。
 因为os库的操作和redis的time操作返回的数值是不确定的，特别当主从复制的时候，这个值在不同副本中的值可能会不同。
 
 
