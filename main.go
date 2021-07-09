@@ -25,7 +25,7 @@ func main(){
 
 	c := redis.NewConn(conn, 3*time.Second, 3*time.Second)
 
-	f, err := os.Open("./lock/lock.lua")
+	f, err := os.Open("./ratelimit/rate.lua")
 	if err != nil {
 		println("Open failed:", err.Error())
 		os.Exit(1)
@@ -43,14 +43,21 @@ func main(){
 		os.Exit(1)
 	}
 
-	result, err := redis.Int(c.Do("EVALSHA", checkSum, 1, "locker", "lock", "uuid", "80"))
-	if err != nil && err != redis.ErrNil{
-		println("SCRIPT LOAD failed:", err.Error())
-		os.Exit(1)
-	}
-	fmt.Println(result, err)
+	//result, err := redis.Int(c.Do("EVALSHA", checkSum, 1, "locker", "lock", "uuid", "80"))
+	//if err != nil && err != redis.ErrNil{
+	//	println("SCRIPT LOAD failed:", err.Error())
+	//	os.Exit(1)
+	//}
+	//fmt.Println(result, err)
+	//
+	//result, err = redis.Int(c.Do("EVALSHA", checkSum, 1, "locker", "unlock", "uuid"))
+	//if err != nil && err != redis.ErrNil{
+	//	println("SCRIPT LOAD failed:", err.Error())
+	//	os.Exit(1)
+	//}
+	//fmt.Println(result, err)
 
-	result, err = redis.Int(c.Do("EVALSHA", checkSum, 1, "locker", "unlock", "uuid"))
+	result, err := redis.Int(c.Do("EVALSHA", checkSum, 4, "second", "minute", "hour", "config", "visit", time.Now().Unix()))
 	if err != nil && err != redis.ErrNil{
 		println("SCRIPT LOAD failed:", err.Error())
 		os.Exit(1)
