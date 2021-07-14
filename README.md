@@ -143,6 +143,7 @@ Redis Nil multi bulk reply   ->   Lua false boolean type
 
 ### 示例
 * lock: 分布式锁
+* rate limit: 限流，时间桶实现
 
 
 ### Reference:
