@@ -128,7 +128,7 @@ local function isRuleValidNow(dict, validator)
     return validator(dict)
 end
 
--- 获得验证器
+-- 获得验证器 TODO: testing
 local function getValidator(type, now, time, count)
     local second, minute, hour = getTimeDetails(now)
     local beginSecond, beginMinute, beginHour = getBeginTime(now)
