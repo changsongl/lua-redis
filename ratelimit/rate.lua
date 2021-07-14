@@ -29,8 +29,13 @@ local function PrintTable(table , level)
     print(indent .. "}")
 end
 
+-- 获取开始时间Key
+local function getBeginTimeKey(timeIndex)
+    return string.format("%d-last-time", timeIndex)
+end
+
 -- 拆分string
-local function explode (_str, sep)
+local function explode(_str, sep)
     local pos, arr = 0, {}
     for st, sp in function() return string.find( _str, sep, pos, true ) end do
         table.insert(arr, string.sub(_str, pos, st-1 ))
@@ -66,7 +71,7 @@ end
 -- 对key的元素进行+1
 local function incr(key, timeIndex, beginTime, expireTime)
     -- 查看这一秒是否有数据
-    local lastIndex = string.format("%d-last-time", timeIndex)
+    local lastIndex = getBeginTimeKey(timeIndex)
     local dict = redis.call("HMGET", key, timeIndex, lastIndex)
 
     -- 这一秒的数据不为空，检查是否开始时间要比第一次更新这个槽的时间要晚，
@@ -118,34 +123,89 @@ local function extractTypeTimeCount(ruleString)
     return tonumber(dict[1]), tonumber(dict[2]), tonumber(dict[3])
 end
 
--- TODO: 检查当前统计的数据和规则是否还是合法
-local function isRuleValidNow(dict)
+-- 使用检查器去检查是否合法
+local function isRuleValidNow(dict, validator)
+    return validator(dict)
+end
 
+-- 获得验证器
+local function getValidator(type, now, time, count)
+    local second, minute, hour = getTimeDetails(now)
+    local beginSecond, beginMinute, beginHour = getBeginTime(now)
+    local mod, startIndex, beginTime, maxDiff
+    local totalCount = 0
+    if type == 1 then
+        mod = 60
+        startIndex = second
+        beginTime = beginSecond
+        maxDiff = 60
+    elseif type == 2 then
+        mod = 60
+        startIndex = minute
+        beginTime = beginMinute
+        maxDiff = 60 * 60
+    else
+        mod = 24
+        startIndex = hour
+        beginTime = beginHour
+        maxDiff = 24 * 60 * 60
+    end
+
+    return function(dict)
+
+        for counter = 1, time do
+            local timeSlot = (startIndex + counter - 1) % mod
+            local beginTimeIndex = getBeginTimeKey(timeSlot)
+
+            if dict[timeSlot] and dict[beginTimeIndex] and dict[beginTimeIndex] <= maxDiff then
+                totalCount = totalCount + 1
+            end
+        end
+
+        return totalCount <= count
+    end
+end
+
+-- 获得时间槽字典
+local function getDictByType(type, secondDict, minuteDict, hourDict)
+    if type == 1 then
+        return secondDict
+    elseif type == 2 then
+        return minuteDict
+    else
+        return hourDict
+    end
+end
+
+-- 打印未成功通过的日志
+local function logValidationFailed(nowTs, ruleString)
+    redis.log(redis.LOG_NOTICE, string.format("rule not pass (time: %d, rule:%s)", nowTs, ruleString))
 end
 
 -- 检查是否超过访问限制规则中的一条，如果已超过则返回0，没超过则返回1
-local function checkRule(secondKey, minuteKey, hourKey, configKey, now)
+local function checkRules(secondKey, minuteKey, hourKey, configKey, now)
     local secondDict = getBucketDetailsDictionary(secondKey)
+    local minuteDict = getBucketDetailsDictionary(minuteKey)
+    local hourDict = getBucketDetailsDictionary(hourKey)
 
     local rules = getRateLimitRules(configKey)
-    for i, ruleString in ipairs(rules) do
+    for _, ruleString in ipairs(rules) do
         local type, time, count = extractTypeTimeCount(ruleString)
-        local result = true
+        local dict = getDictByType(type, secondDict, minuteDict, hourDict)
+        local validator = getValidator(type, now, time, count)
 
-        if type == 1 then
-
-        elseif type == 2 then
-        elseif type == 3 then
+        if ~isRuleValidNow(dict, validator) then
+            logValidationFailed(now, ruleString)
+            return false
         end
     end
-
 end
 
 -- 访问逻辑
 local function visit(secondKey, minuteKey, hourKey, configKey, now)
     incrVisiting(secondKey, minuteKey, hourKey, now)
 
-    return checkRule(secondKey, minuteKey, hourKey, configKey, now)
+    return checkRules(secondKey, minuteKey, hourKey, configKey, now)
 end
 
 -- command 字典
